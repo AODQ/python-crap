@@ -7,8 +7,8 @@ DLang inspired Range implementation in python. Advantages over lists:
     Output, Assignable, Infinite
   Introspection functions (Is_input_range, Is_infinte, etc)
   "UFCS"-optional chaining functions:
-    map, filter, reduce, chain, enumerate, drop, dropback, cycle,
-    chunks, choose, zip, stride, tee, take, array, and retro
+    map, filter, reduce, chain, enumerate, drop, dropback, cycle, iota, chunks,
+    choose, zip, stride, tee, take, array, and retro
   To change size, just write to a range's length
 Other things:
   + to concatenate, == for equality.
