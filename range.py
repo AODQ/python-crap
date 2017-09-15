@@ -1,22 +1,22 @@
 """
 DLang inspired Range implementation in python. Advantages over lists:
   Static Typing with 'Any' and Variant option
-  Memory pool [Slices do not copy unless modified]
+  Memory pool [Slices do not copy unless modified] X
   Many different range types:
-    Input, Forward, Bidirectional, Random Access
-    Output, Assignable, Infinite
-  Introspection functions (Is_input_range, Is_infinte, etc)
+    Input, Forward, Bidirectional, Random Access X
+    Output, Assignable, Infinite                 X
+  Introspection functions (Is_input, Is_infinte, etc) X
   "UFCS"-optional chaining functions:
     map, filter, reduce, chain, enumerate, drop, dropback, cycle, iota, chunks,
     choose, zip, stride, tee, take, array, and retro
-  To change size, just write to a range's length
+  To change size, just write to a range's length X
 Other things:
-  + to concatenate, == for equality.
+  + to concatenate, == for equality. X
 Restrictions:
   python lists, maps, dicts, etc are not allowed in a range
 """
 
-class _MemoryPool:
+class __MemoryPool:
   """
   A range slice is only a new view on memory, it does not create a new copy,
   however if a modification is made to the memory pool where multiple viewers
@@ -34,7 +34,6 @@ class _MemoryPool:
     # Allocate a chunk of memory, returns the 'ptr'
     if ( len(s._freemem) > 0 ):
       (ptr, s._freemem) = (s._freemem[0], s._freemem[1:])
-      print("FREED MEM!")
     else:
       s._counter += 1
       ptr = s._counter
@@ -66,24 +65,29 @@ class _MemoryPool:
   def RElement(s, ptr, index):
     return s._mempool[ptr][1][index]
 
-_memorypool = _MemoryPool()
+_memorypool = __MemoryPool()
 
 class Any:
   pass
 
 class Variant:
+  """ Variant using built-in python list """
   def __init__(s, *args):
     s._types = args
-
-def _IsType(x, y):
-  pass
+  def Superset(s, o):
+    """ Returns true if s is a superset of o """
+    amt = 0
+    g = len(o)
+    while ( g != 0 ):
+      amt += (g in s)
+    print(amt)
 
 class TemplateRange:
   """ A template range that works with memory pool.
         Usage: Any|ForwardRange(10, "hi", int|ForwardRange(10, 20))
   """
   def __init__(s, *args, noalloc=None):
-    s._type = "Any"
+    s._type = Any
     (s.begin, s.end) = (0, len(args))
     if ( not noalloc ):
       s._ptr = _memorypool.Allocate(args)
@@ -91,9 +95,14 @@ class TemplateRange:
     _memorypool.Deallocate(s._ptr)
   def __ror__(s, type):
     """ Type check """
-    s._type = type
+    s._type = type if isinstance(type, Variant) else Variant(type)
     # verify type TODO
     return s
+  def Compatible(s, o):
+    "Returns if the type of s is a superset of o [for say, s+o]"
+    if ( s._type == Any ): return true
+    else if ( o._type == Any ): return false
+    return s.Variant(o)
 
 class _FakeFront():
   """To allow: myrange.Front() , or myrange.Front.Set(5)"""
@@ -127,7 +136,7 @@ class ForwardRange(InputRange):
   def __init__(s, *args, noalloc=None):
     super().__init__(*args, noalloc=noalloc)
   def Save(s):
-    sav = ForwardRange(noalloc=True)
+    sav = (type(s))(noalloc=True)
     sav._type = s._type
     (sav.begin, sav.end) = (s.begin, s.end)
     sav._ptr = s._ptr
@@ -138,7 +147,7 @@ class ForwardRange(InputRange):
     savo = o.Save()
     while ( not savs.Empty() and not savo.Empty() ):
       if ( savs.Front() != savo.Front() ):
-        return false
+        return False
       savs.Pop_front()
       savo.Pop_front()
     return savs.Empty() and savo.Empty()
@@ -177,25 +186,89 @@ class OutputRange(TemplateRange):
     s.end += 1
 
 class Range(RandomAccessRange, OutputRange):
+  """ The 'array' implementation of range; giving power of ranges with
+      convenience utility functions
+  """
   def __init__(s, *args, noalloc=None):
-    super().__init__(*args) #python , noallocwill call linearly, no diamond problem(!)
+    super().__init__(*args, noalloc=noalloc)
+
   def Length(s, length=-1):
+    if ( length >= 0 ):
+      assert(length <= s.Length())
+      s.end = s.begin + length
+      # TODO touch memory pool
     return s.end-s.begin
+
+  def __add__(s, o):
+    assert(Is_input(o))
+    assert(s.Compatible(o))
+    (dfrom, dto) = (o.Save(), s.Save())
+    while ( not dfrom.Empty() ):
+      dto.Put(dfrom.Front())
+      dfrom.Pop_front()
+    return dto
 
 def _RFuncRange(drange):
   """Saves the range if applicable"""
   return drange.Save() if isinstance(drange, ForwardRange) else drange
 
-def Is_input_range(drange):
+def Is_input(drange):
   return (hasattr(drange, "Empty") and
           hasattr(drange, "Pop_front") and
           hasattr(drange, "Front"))
 
-def Is_forward_range(drange):
-  return (Is_input_range(drange) and hasattr(drange, "Save"))
+def Is_output(drange):
+  return hasattr(drange, "Put")
+
+def Is_forward(drange):
+  return (Is_input(drange) and hasattr(drange, "Save"))
+
+def Is_forward_output(drange):
+  return Is_forward(drange) and Is_output(drange)
+
+def Is_bidirectional(drange):
+  return (Is_forward(drange) and hasattr(drange, "Back") and
+                                 hasattr(drange, "Pop_back"))
+
+def Is_bidirectional_output(drange):
+  return (Is_bidirectional(drange) and Is_output(drange) and
+          hasattr(drange, "Put_back"))
+
+def Is_random_access(drange):
+  return (Is_bidirectional(drange) and hasattr(drange, "__getitem__"))
+
+def Is_random_access_output(drange):
+  return Is_random_access(drange) and Is_bidirection_output(drange)
+
+def Is_random_access_assignable(drange):
+  return Is_random_access_output(drange) and hasattr(drange, "__setitem__")
+
+def Take(drange, amt):
+  """ Takes amt from range (lazily), otherwise the range length if the amt is
+      less than it """
+  assert Is_forward(drange)
+  class _Take:
+    def __init__(s, drange, amt):
+      s.drange = drange
+      s.amt = amt
+    def Empty(s):
+      return (s.drange.Empty() or s.amt == 0)
+    # Empty = lambda s: (s.drange.Empty() or s.amt == 0)
+    def Front(s):
+      assert(s.amt > 0)
+      return s.drange.Front()
+    def Pop_front(s):
+      assert(s.amt > 0)
+      s.amt -= 1
+      s.drange.Pop_front()
+    def Save(s):
+      return Take(s.drange, s.amt)
+    def __str__(s):
+      return f"<Take {s.drange}>"
+  return _Take(drange.Save(), amt)
 
 def Map(drange, dlambda):
-  assert Is_forward_range(drange)
+  assert Is_forward(drange)
   class _Map:
     def __init__(s, drange, dlambda):
       s.drange = drange
@@ -211,11 +284,10 @@ def Map(drange, dlambda):
       return Map(s.drange, s.dlambda)
     def __str__(s):
       return f"<Map {s.drange}>"
-  dmap = _Map(drange.Save(), dlambda)
-  return dmap
+  return _Map(drange.Save(), dlambda)
 
 def Filter(drange, dlambda):
-  assert Is_forward_range(drange) and not drange.Empty()
+  assert Is_forward(drange) and not drange.Empty()
   class _Filter:
     def __init__(s, drange, dlambda):
       s.drange = drange
@@ -233,7 +305,7 @@ def Filter(drange, dlambda):
   return _Filter(drange.Save(), dlambda)
 
 def ReduceImpl(drange, dlambda, seed=None):
-  assert Is_forward_range(drange) and not drange.Empty()
+  assert Is_forward(drange) and not drange.Empty()
   # pop seed
   copy = drange.Save()
   reduce_seed = copy.Front() if seed is None else seed
@@ -278,7 +350,7 @@ def Iota(begin, end, stride=1):
 
 def Array(drange):
   """ Computes lazy range, returns Range of results """
-  assert Is_forward_range(drange)
+  assert Is_forward(drange)
   g = drange.Save()
   orange = Range()
   while ( not g.Empty() ):
@@ -290,16 +362,30 @@ def Array(drange):
 
 def Print_all(drange, recurse=0):
   """ Deep print of all of range elements """
-  assert Is_forward_range(drange)
+  assert Is_forward(drange)
   drange = drange.Save()
+  if ( recurse == 0 ):
+    print("------------------------------------")
   print(" "*recurse, drange.__str__())
   while ( not drange.Empty() ):
     front = drange.Front()
     drange.Pop_front()
-    if ( Is_forward_range(front) ):
+    if ( Is_forward(front) ):
       Print_all(front, recurse+2)
     else:
       print(" "*recurse + front.__str__())
+  if ( recurse == 0 ):
+    print("------------------------------------")
+
+def Is_infinite(drange):
+  return Is_input(drange) and isinstance(drange.Empty, InfiniteEmpty)
+
+class InfiniteEmpty():
+  """ A hack to allow infinite ranges so users don't have to check
+      (ifisinstance(s.Empty, int)) and Is_infinite introspection can work
+      despite Empty always returning false.
+  """
+  __call__ = lambda s: False
 
 if ( __name__ == "__main__" ):
   # Test input ranges
@@ -333,13 +419,15 @@ if ( __name__ == "__main__" ):
 
   # Test forward ranges and any with range in another, and equality
   fr_range = Any|ForwardRange(10, "hi", int|ForwardRange(10, 20))
+  fr_copy = fr_range.Save()
   #   pass
   assert(fr_range.Front() == 10)
   fr_range.Pop_front()
   assert(fr_range.Front() == "hi")
   fr_range.Pop_front()
   assert(fr_range.Front() == int|ForwardRange(10, 20))
-  del fr_range
+  assert(fr_copy == Any|ForwardRange(10, "hi", int|ForwardRange(10, 20)))
+  del fr_range, fr_copy
 
   # Test Random access range
   ra_range = int|RandomAccessRange(10, 20, 30)
@@ -352,38 +440,42 @@ if ( __name__ == "__main__" ):
   del ra_range, an_range
 
   # Test static introspection and infinite range
-  # class FibonacciRange:
-  #   empty = false
-  #   def __init__(s):  (s.l, s.r) = (1, 0)
-  #   def Pop_front(s): (s.l, s.r) = (s.l+s.r, s.l)
-  #   def Front(s):     return s.l
+  class FibonacciRange:
+    Empty = InfiniteEmpty()
+    def __init__(s):  (s.l, s.r) = (1, 0)
+    def Pop_front(s): (s.l, s.r) = (s.l+s.r, s.l)
+    def Front(s):     return s.l
+    def Save(s):
+      fib = FibonacciRange()
+      (fib.l, fib.r) = (s.l, s.r)
+      return fib
 
-  # fib = FibonacciRange();
-  # fib10 = fib.take(10).array() # Get 10 of fib and make it an array
-  # assert(fib10 == Range(1, 1, 2, 3, 5, 8, 13, 21, 34, 55))
-  # assert(Is_infinite(fib))
-  # assert(Is_forward_range(fib))
-  # del FibonacciRange, fib10, fib
-  # assert(_memorypool.RSlice_count() == 0)
+  fib = FibonacciRange()
+  assert(Is_infinite(fib))
+  assert(Is_input(fib))
+  assert(Is_forward(fib))
+  assert(not Is_bidirectional(fib))
+  assert(not Is_random_access(fib))
+  fib10 = Take(fib, 10)
+  assert(fib10 == Range(1, 1, 2, 3, 5, 8, 13, 21, 34, 55))
+  assert(fib10 != Range(1, 1, 2, 3, 5, 8, 13, 21, 34, 44))
+  assert(Reduce(fib10, lambda x, y: x+y) == 143)
 
-  # # Test concatenate and length with range
-  # r_range = int|Range(2, 3, 4)
-  # r_range = r_range + int|Range(2, 3, 4)
-  # try:
-  #   r_range = r_range + string|Range("hi")
-  #   assert(0)
-  # except Exception:
-  #   pass
+  # Test concatenate and length with range
+  r_range = int|Range(2, 3, 4)
+  r_range = r_range + (int|Range(5, 6, 7))
+  assert(r_range == Range(2, 3, 4, 5, 6, 7))
+  try:
+    r_range = r_range + (str|Range("hi"))
+    print("ASSERTION ERROR INT+STR")
+  except Exception:
+    pass
 
-  # try:
-  #   r_range = r_range + int|Range("hi")
-  #   assert(0)
-  # except Exception:
-  #   pass
-
-  # assert(r_range.length == 6)
-  # r_range.length = 3
-  # assert(r_range == Range(2, 3, 4))
+  assert(r_range.Length() == 6)
+  r_range.Length(3)
+  assert(r_range == Range(2, 3, 4))
+  r_range.Length(0)
+  assert(r_range.Empty())
 
   # Test ufcs
   # a = int|ForwardRange(10, 20, 30)
