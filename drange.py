@@ -101,8 +101,8 @@ if ( __name__ == "__main__" ):
     Empty = InfiniteEmpty()
     def __init__(s, l=1, r=0):  (s.l, s.r) = (l, r)
     def Pop_front(s): (s.l, s.r) = (s.l+s.r, s.l)
-    Front(s) = lambda s: s.l
-    Save(s) = lambda s: FibonacciRange(fib.l, fib.r)
+    Front = lambda s: s.l
+    Save  = lambda s: FibonacciRange(s.l, s.r)
 
   fib = FibonacciRange()
   assert(Is_infinite(fib))

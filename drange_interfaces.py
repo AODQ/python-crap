@@ -59,34 +59,44 @@ class _Any:
   Valid = lambda s, o: True
 Any = _Any()
 
-class Variant:
-  " Variant using built-in python list, not ranges, to avoid recursion "
-  def __init__(s, *args):
-    s._types = args
-  __str__ = lambda s: f"Variant {s._types}"
-  def Valid(s, o):
-    " returns true if o is inside variant "
-    for i in s._types:
-      print("TYPE: ", i)
-      if ( isinstance(i, RangeT) ): #  check if range
-        print("RANGEEE")
-        print("O: ", o)
-        print(isinstance(o, TemplateRange))
-        if ( isinstance(o, TemplateRange) and i._type.Valid(o) ):
-          print("TRUEE")
-          return True
-      elif ( isinstance(o, i) ): # otherwise it's just a type
-        return True
-    print("COULDNT DO ", s, " AND ", o)
-    return False
-  def Superset(s, o):
-    " Returns true if s is a superset of variant o "
-    assert(isinstance(o, Variant))
-    amt = 0
-    g = len(o._types)-1
-    for i in o._types:
-      amt += (i in s._types)
-    return amt == len(o._types)
+# class Variant:
+#   " Variant using built-in python list, not ranges, to avoid recursion "
+#   def __init__(s, *args):
+#     s._types = args
+#   __str__ = lambda s: f"Variant {s._types}"
+#   def Valid(s, o):
+#     " returns true if o is inside variant "
+#     print("-------------------")
+#     # check superset of variant
+#     if ( isinstance(o, Variant) ):
+#       return s.Superset(o)
+#     # check individual element of variant
+#     print("CHECKKING ", o, " with ", s)
+#     for i in s._types:
+#       print("ITERATING TYPE : ", i)
+#       print("CHECKINGW ITH: ", o)
+#       if ( isinstance(i, RangeT) ): #  check if range
+#         print("RANGEEE")
+#         print("O: ", o)
+#         print(isinstance(o, TemplateRange))
+#         if ( isinstance(o, TemplateRange) and i._type.Valid(o._type) ):
+#           print("TRUEE")
+#           return True
+#       elif ( isinstance(o, Variant) and isinstance(i, Variant) ):
+#         print("CHECKING SUPERSET")
+#         return i.Superset(o)
+#       elif ( isinstance(o, i) ): # otherwise it's just a type
+#         return True
+#     print("COULDNT DO ", s, " AND ", o)
+#     return False
+#   def Superset(s, o):
+#     " Returns true if s is a superset of variant o "
+#     assert(isinstance(o, Variant))
+#     amt = 0
+#     g = len(o._types)-1
+#     for i in o._types:
+#       amt += (i in s._types)
+#     return amt == len(o._types)
 
 def Translate_type(type):
   return type if (isinstance(type, Variant) or isinstance(type, _Any))else(
