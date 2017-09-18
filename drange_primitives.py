@@ -100,3 +100,16 @@ def Walk_length(drange):
     amt += 1
     drange.Pop_front()
   return amt
+
+def Add_Python_Iterator(_drange):
+  class _TempDrangeIterator:
+    def __init__(s, drange):
+      s.drange = drange.Save()
+    __iter__ = lambda s: s
+    def __next__(s):
+      if ( s.drange.Empty() ):
+        raise StopIteration
+      front = s.drange.Front()
+      s.drange.Pop_front()
+      return front
+  return _TempDrangeIterator(_drange)

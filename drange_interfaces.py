@@ -56,47 +56,49 @@ class __MemoryPool:
 _memorypool = __MemoryPool()
 class _Any:
   __str__ = lambda s: "Any"
-  Valid = lambda s, o: True
+  Valid_Instance = lambda s, o: True
 Any = _Any()
 
-# class Variant:
-#   " Variant using built-in python list, not ranges, to avoid recursion "
-#   def __init__(s, *args):
-#     s._types = args
-#   __str__ = lambda s: f"Variant {s._types}"
-#   def Valid(s, o):
-#     " returns true if o is inside variant "
-#     print("-------------------")
-#     # check superset of variant
-#     if ( isinstance(o, Variant) ):
-#       return s.Superset(o)
-#     # check individual element of variant
-#     print("CHECKKING ", o, " with ", s)
-#     for i in s._types:
-#       print("ITERATING TYPE : ", i)
-#       print("CHECKINGW ITH: ", o)
-#       if ( isinstance(i, RangeT) ): #  check if range
-#         print("RANGEEE")
-#         print("O: ", o)
-#         print(isinstance(o, TemplateRange))
-#         if ( isinstance(o, TemplateRange) and i._type.Valid(o._type) ):
-#           print("TRUEE")
-#           return True
-#       elif ( isinstance(o, Variant) and isinstance(i, Variant) ):
-#         print("CHECKING SUPERSET")
-#         return i.Superset(o)
-#       elif ( isinstance(o, i) ): # otherwise it's just a type
-#         return True
-#     print("COULDNT DO ", s, " AND ", o)
-#     return False
-#   def Superset(s, o):
-#     " Returns true if s is a superset of variant o "
-#     assert(isinstance(o, Variant))
-#     amt = 0
-#     g = len(o._types)-1
-#     for i in o._types:
-#       amt += (i in s._types)
-#     return amt == len(o._types)
+class Variant:
+  " Variant using built-in python tuple, not ranges "
+  def __init__(s, *args):
+    s._types = tuple(args)
+  __str__ = lambda s: f"Variant {s._types}"
+  def Valid_Type(s, otype):
+    assert(isinstance(otype, type))
+    for itype in s._types:
+      print("ITER TYPE: ", itype)
+      print("CHECK TYPE: ", otype)
+      if ( isinstance(itype, RangeT) ):
+        if ( itype.Valid_Type(otype) ):
+          return True
+      elif ( issubclass(otype, itype) ):
+        return True
+    return False
+  def Valid_Instance(s, oinst):
+    assert(not isinstance(oinst, type))
+    " returns true if o is inside variant "
+    if ( isinstance(oinst, TemplateRange) ):
+      # str|Range == ["ha", "ba", "ga", "ja"]
+      trange = oinst.Save()
+      while ( not trange.Empty() ):
+        assert(trange.Front()
+
+    for i in _memorypool._mempool[s._ptr][1]:
+      print("VALIDATING OF: ", i)
+      assert(s._type.Valid_Instance(i))
+      # return s.Valid_Instance(oinst._type)
+    elif ( isinstance(oinst, Variant) ):
+      return s.Valid_Superset(oinst)
+    return s.Valid_Type(type(oinst))
+  def Valid_Superset(s, ovariant):
+    " Returns true if s is a superset of variant o "
+    assert(isinstance(ovariant, Variant))
+    amt = 0
+    g = len(ovariant._types)-1
+    for i in ovariant._types:
+      amt += (i in s._types)
+    return amt == len(ovariant._types)
 
 def Translate_type(type):
   return type if (isinstance(type, Variant) or isinstance(type, _Any))else(
@@ -122,7 +124,7 @@ class TemplateRange:
     s._type = Translate_type(type)
     for i in _memorypool._mempool[s._ptr][1]:
       print("VALIDATING OF: ", i)
-      assert(s._type.Valid(i))
+      assert(s._type.Valid_Instance(i))
     return s
   RStr = lambda s: ""
   __str__ = lambda s: f"{s.RStr()} of {s._type}"
@@ -130,7 +132,7 @@ class TemplateRange:
     "Returns if the type of s is a superset of o [for say, s+o]"
     if   ( isinstance(s._type, _Any) ): return True
     elif ( isinstance(o._type, _Any) ): return False
-    return s._type.Superset(o._type)
+    return s._type.Valid_Superset(o._type)
 
 class RangeT():
   "A range 'type', ei: (int|RangeT)|Range(2, 3)"

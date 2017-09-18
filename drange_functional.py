@@ -104,6 +104,7 @@ def Array(drange):
   """ Computes lazy range, returns Range of results """
   assert Is_forward(drange)
   g = drange.Save()
+  from drange import Range
   orange = Range()
   while ( not g.Empty() ):
     front = g.Front()
