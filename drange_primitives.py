@@ -64,7 +64,7 @@ def Pop_back_n(drange, n, dlambda=None):
     n -= 1
     if ( dlambda != None ):
       dlambda(drange.Back())
-    drange.Pop_front()
+    drange.Pop_back()
   return n
 
 def Move_front(drange, dlambda=None):
@@ -101,7 +101,7 @@ def Walk_length(drange):
     drange.Pop_front()
   return amt
 
-def Add_Python_Iterator(_drange):
+def PyIter(_drange):
   class _TempDrangeIterator:
     def __init__(s, drange):
       s.drange = drange.Save()

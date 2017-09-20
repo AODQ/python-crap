@@ -54,62 +54,61 @@ class __MemoryPool:
     return s._mempool[ptr][1][index]
 
 _memorypool = __MemoryPool()
+
 class _Any:
   __str__ = lambda s: "Any"
   Valid_Instance = lambda s, o: True
 Any = _Any()
+Any._types = tuple([Any])
 
 class Variant:
   " Variant using built-in python tuple, not ranges "
   def __init__(s, *args):
     s._types = tuple(args)
   __str__ = lambda s: f"Variant {s._types}"
-  def Valid_Type(s, otype):
-    assert(isinstance(otype, type))
-    for itype in s._types:
-      print("ITER TYPE: ", itype)
-      print("CHECK TYPE: ", otype)
-      if ( isinstance(itype, RangeT) ):
-        if ( itype.Valid_Type(otype) ):
-          return True
-      elif ( issubclass(otype, itype) ):
-        return True
-    return False
   def Valid_Instance(s, oinst):
     assert(not isinstance(oinst, type))
-    " returns true if o is inside variant "
-    if ( isinstance(oinst, TemplateRange) ):
-      # str|Range == ["ha", "ba", "ga", "ja"]
-      trange = oinst.Save()
-      while ( not trange.Empty() ):
-        assert(trange.Front()
+    for t in s._types:
+      if ( hasattr(t, "Valid_Instance") ):
+        if ( t.Valid_Instance(oinst) ):
+          return True
+      elif ( issubclass(t, type(oinst)) ):
+        return True
+    return False
 
-    for i in _memorypool._mempool[s._ptr][1]:
-      print("VALIDATING OF: ", i)
-      assert(s._type.Valid_Instance(i))
-      # return s.Valid_Instance(oinst._type)
-    elif ( isinstance(oinst, Variant) ):
-      return s.Valid_Superset(oinst)
-    return s.Valid_Type(type(oinst))
-  def Valid_Superset(s, ovariant):
-    " Returns true if s is a superset of variant o "
-    assert(isinstance(ovariant, Variant))
-    amt = 0
-    g = len(ovariant._types)-1
-    for i in ovariant._types:
-      amt += (i in s._types)
-    return amt == len(ovariant._types)
+def Valid_Type_Superset(ltype, rtype):
+  (amt, g) = (0, len(rtype._types)-1)
+  for i in rtype._types:
+    amt += (i in ltype._types)
+  return amt == len(rtype._types)
+
+class RangeT(Variant):
+  " Range type "
+  def __init__(s, *args):
+    s._types = Variant(*args)
+  def Valid_Instance(s, oinst):
+    if ( not isinstance(oinst, TemplateRange) ):
+      return False
+    if ( not Valid_Type_Superset(s._types, oinst._type) ):
+      return False
+    for val in _memorypool._mempool[oinst._ptr][1]:
+      if ( not s._types.Valid_Instance(val) ):
+        return False
+    return True
+  __str__ = lambda s: f"RangeT {s._types}"
 
 def Translate_type(type):
   return type if (isinstance(type, Variant) or isinstance(type, _Any))else(
                  Variant(type))
 
-class TemplateRange:
+class TemplateRange():
   """ A template range that works with memory pool.
         Usage: Any|ForwardRange(10, "hi", int|ForwardRange(10, 20))
   """
   def __init__(s, *args, noalloc=None):
     s._type = Any
+
+
     (s.begin, s.end) = (0, len(args))
     if ( not noalloc ):
       s._ptr = _memorypool.Allocate(args)
@@ -119,11 +118,8 @@ class TemplateRange:
     return type|s
   def __ror__(s, type):
     """ Type check """
-    print("----")
-    print("TYPE: ", type)
     s._type = Translate_type(type)
     for i in _memorypool._mempool[s._ptr][1]:
-      print("VALIDATING OF: ", i)
       assert(s._type.Valid_Instance(i))
     return s
   RStr = lambda s: ""
@@ -132,12 +128,7 @@ class TemplateRange:
     "Returns if the type of s is a superset of o [for say, s+o]"
     if   ( isinstance(s._type, _Any) ): return True
     elif ( isinstance(o._type, _Any) ): return False
-    return s._type.Valid_Superset(o._type)
-
-class RangeT():
-  "A range 'type', ei: (int|RangeT)|Range(2, 3)"
-  def __init__(s, type):
-    s._type = Translate_type(type)
+    return Valid_Type_Superset(s._type, o._type)
 
 class _FakeFront():
   """To allow: myrange.Front() , or myrange.Front.Set(5)"""
@@ -179,6 +170,9 @@ class ForwardRange(InputRange):
     return sav
   def __eq__(s, o):
     savs = s.Save()
+    from drange_primitives import Is_input
+    if ( not Is_input(o) ):
+      return False
     savo = o.Save()
     while ( not savs.Empty() and not savo.Empty() ):
       if ( savs.Front() != savo.Front() ):
