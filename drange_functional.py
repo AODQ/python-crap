@@ -5,27 +5,40 @@ from drange           import *
 
 # I need to figure out how to remove duplicate from here and drange...
 class UFCS_Mixin(object):
-  Map       = lambda s, fambda: Map(s, fambda)
-  Take      = lambda s, amt: Take(s, amt)
-  Filter    = lambda s, fambda: Filter(s, fambda).Array()
-  Reduce    = lambda s, fambda, seed =None: Reduce(s, fambda, seed)
-  Array     = lambda s: Array(s)
-  Print_all = lambda s: Print_all(s)
+  Map       = lambda s, fambda             : Map(s, fambda)
+  Take      = lambda s, amt                : Take(s, amt)
+  Filter    = lambda s, fambda             : Filter(s, fambda)
+  Reduce    = lambda s, fambda, seed =None : Reduce(s, fambda, seed)
+  Retro     = lambda s                     : Retro(s)
+  Array     = lambda s                     : Array(s)
+  Print_all = lambda s                     : Print_all(s)
+  Split     = lambda s, fambda             : Split(s, fambda)
+  Chain     = lambda s, *args              : Chain(s, *args)
+  Stride    = lambda s, strideamt          : Stride(s, strideamt)
+  Enumerate = lambda s                     : Enumerate(s)
+  Cycle     = lambda s                     : Cycle(s)
+  Chunks    = lambda s, chunksize          : Chunks(s, chunksize)
+  Zip       = lambda s, o                  : Zip(s, o)
+  Tee       = lambda s, fambda             : Tee(s, fambda)
+  def Drop(s, n):
+    trange = s.Save()
+    Pop_front_n(trange, n)
+    return trange
+  def Dropback(s, n):
+    trange = s.Save()
+    Pop_back_n(trange, n)
+    return trange
+  def __iter__(s):
+    from drange_primitives import PyIter
+    return PyIter(s)
 
 class _BaseImpl(UFCS_Mixin):
   "Base implementation of functional class, with half-assed Invariants"
   def __init__(s, drange):
     s.drange = drange
-  Invariant = lambda s: None
-  def Empty(s):
-    return s.drange.Empty()
-  def Front(s):
-    s.Invariant()
-    return s.drange.Front()
-  def Pop_front(s):
-    s.Invariant()
-    s.drange.Pop_front()
   RStr = lambda s: ""
+  Front = lambda s: s.drange.Front()
+  Empty = lambda s: s.drange.Empty()
   __str__ = lambda s: f"{s.RStr()} <{s.drange}>"
 
 class _TakeImpl(_BaseImpl):
@@ -33,13 +46,11 @@ class _TakeImpl(_BaseImpl):
     super().__init__(drange)
     s.drange = drange
     s.amt = amt
-  Empty = lambda s: super().Empty() or s.amt == 0
-  def Invariant(s):
+  Empty = lambda s: s.drange.Empty() or s.amt == 0
+  def Front(s):
     assert(s.amt > 0)
-  def Pop_front(s): # can't use super().Pop_front()
-    s.Invariant()
     s.amt -= 1
-    s.drange.Pop_front()
+    return s.drange.Front()
   Save = lambda s: Take(s.drange, s.amt)
   RStr = lambda s: "Take"
 def Take(drange, amt):
@@ -51,7 +62,7 @@ class _MapImpl(_BaseImpl):
   def __init__(s, drange, dlambda):
     super().__init__(drange)
     s.dlambda = dlambda
-  Front = lambda s: s.dlambda(super().Front())
+  Front = lambda s: s.dlambda(s.drange.Front())
   Save = lambda s: Map(s.drange, s.dlambda)
   RStr = lambda s: "Map"
 def Map(drange, dlambda):
@@ -60,31 +71,70 @@ def Map(drange, dlambda):
   assert Is_forward(drange)
   return _MapImpl(drange.Save(), dlambda)
 
-class _FilterImpl(_BaseImpl):
+class _TeeImpl(_BaseImpl):
   def __init__(s, drange, dlambda):
     super().__init__(drange)
     s.dlambda = dlambda
-  Front = lambda s: super().Front() if s.dlambda(super().Front()) else None
-  Save = lambda s: Filter(s.drange, s.dlambda)
+  def Front(s):
+    val = s.drange.Front()
+    s.dlambda(val)
+    return val
+  Save = lambda s: Tee(s.drange, s.dlambda)
+  RStr = lambda s: "Tee"
+def Tee(drange, dlambda):
+  """ Lazily tees a lambda over a range, which applies dlambda to each element
+      but returns the original range (for side effects in middle of a chain,
+      ei, print) """
+  assert Is_forward(drange)
+  return _TeeImpl(drange.Save(), dlambda)
+
+class _RetroImpl(_BaseImpl):
+  def __init__(s, drange):
+    super().__init__(drange)
+  Front = lambda s: s.drange.Back()
+  Save = lambda s: Retro(s.drange)
+  RStr = lambda s: "Retro"
+def Retro(drange):
+  # Iterates a bidirectional range backwards
+  assert Is_bidirectional(drange)
+  return _RetroImpl(drange.Save())
+
+class _FilterImpl(_BaseImpl):
+  def __init__(s, drange, dlambda, seed=None):
+    super().__init__(drange)
+    s.dlambda = dlambda
+    s.uppity = seed
+    if ( seed == None ): s.Front()
+  def Front(s):
+    val = s.uppity
+    while ( not s.drange.Empty() ):
+      front = s.drange.Front()
+      if ( s.dlambda(front) ):
+        s.uppity = front
+        return val
+    s.uppity = None
+    return val
+  Empty = lambda s: s.uppity == None
+  Save = lambda s: Filter(s.drange, s.dlambda, s.uppity)
   RStr = lambda s: "Filter"
-def Filter(drange, dlambda):
+def Filter(drange, dlambda, seed=None):
   """ Lazily filters the range, where each element in the returned range
       returned true when applied to dlambda """
   assert Is_forward(drange) and not drange.Empty()
-  return _FilterImpl(drange.Save(), dlambda)
+  return _FilterImpl(drange.Save(), dlambda, seed)
 
 class _EnumerateImpl(_BaseImpl):
   def __init__(s, drange):
     super().__init__(drange)
     s.enumerator = 0
-  Front = lambda s: (super().Front(), s.enumerator)
-  def Pop_front(s):
+  def Front(s):
+    val = (s.drange.Front(), s.enumerator)
     s.enumerator += 1
-    super().Pop_front()
+    return val
   Save = lambda s: Enumerate(s.drange)
   RStr = lambda s: "Enumerate"
 def Enumerate(drange):
-  # Lazily enumerates a range [supplies an index with pop_front: (elem, index)]
+  # Lazily enumerates a range [supplies an index with: (elem, index)]
   assert Is_forward(drange)
   return _EnumerateImpl(drange.Save())
 
@@ -92,11 +142,12 @@ class _CycleImpl(_BaseImpl):
   def __init__(s, drange):
     super().__init__(drange)
     s.cyclesave = drange.Save()
-  Front = lambda s: super().Front()
-  def Pop_front(s):
-    super().Pop_front()
-    if ( super().Empty() ):
+  Empty = InfiniteEmpty()
+  def Front(s):
+    val = s.drange.Front()
+    if ( s.drange.Empty() ):
       s.drange = s.cyclesave.Save()
+    return val
   Save = lambda s: Cycle(s.drange)
   RStr = lambda s: "Cycle"
 def Cycle(drange):
@@ -108,12 +159,8 @@ class _ZipImpl(_BaseImpl):
   def __init__(s, drange, orange):
     super().__init__(drange)
     s.orange = orange
-  Front = lambda s: (super().Front(), s.orange.Front())
-  def Pop_front(s):
-    super().Pop_front()
-    s.orange.Pop_front()
-  def Empty(s):
-    return s.orange.Empty() or s.drange.Empty()
+  Front = lambda s: (s.drange.Front(), s.orange.Front())
+  Empty = lambda s: s.orange.Empty() or s.drange.Empty()
   Save = lambda s: Zip(s.drange, s.orange)
   RStr = lambda s: "Zip"
 def Zip(drange, orange):
@@ -125,18 +172,13 @@ class _StrideImpl(_BaseImpl):
   def __init__(s, drange, stridesize):
     super().__init__(drange)
     s.stridesize = stridesize
-  def Pop_front(s):
-    for i in range(0, s.stridesize):
-      if ( not super().Empty() ):
-        super().Pop_front()
-  def Empty(s):
-    e = s.drange.Save()
-    for i in range(0, s.stridesize-1):
-      if ( e.Empty() ):
-        return True
-      e.Pop_front()
-    del e
-    return False
+  def Front(s):
+    v = s.drange.Front()
+    for i in range(1, s.stridesize):
+      if ( s.drange.Empty() ): break
+      s.drange.Front()
+    return v
+  def Empty(s): return s.drange.Empty()
   Save = lambda s: Stride(s.drange, s.stridesize)
   RStr = lambda s: "Stride"
 def Stride(drange, stridesize):
@@ -148,19 +190,14 @@ class _ChunksImpl(_BaseImpl):
   def __init__(s, drange, chunksize):
     super().__init__(drange)
     s.chunksize = chunksize
-    s.befchunk = None
   def Front(s):
-    if ( s.befchunk != None ):
-      return s.befchunk
-    s.befchunk = Range()
+    from drange import Range
+    bchunk = Range()
     for i in range(0, s.chunksize):
-      if ( super().Empty() ):
-        return s.befchunk
-      s.befchunk += super().Front()
-      super().Pop_front()
-    return s.befchunk
-  def Pop_front(s):
-    s.befchunk = None
+      if ( s.drange.Empty() ):
+        return bchunk
+      bchunk += s.drange.Front()
+    return bchunk
   Save = lambda s: Chunks(s.drange, s.chunksize)
   RStr = lambda s: "Chunks"
 def Chunks(drange, chunksize):
@@ -168,18 +205,33 @@ def Chunks(drange, chunksize):
   assert Is_forward(drange)
   return _ChunksImpl(drange.Save(), chunksize)
 
+class _SplitImpl(_BaseImpl):
+  def __init__(s, drange, fambda):
+    super().__init__(drange)
+    s.fambda = fambda
+  def Front(s):
+    from drange import Range
+    bchunk = Range()
+    while not s.drange.Empty():
+      val = s.drange.Front()
+      if ( s.fambda(val) ):
+        break;
+      bchunk += val
+    return bchunk
+  Save = lambda s: Split(s.drange, s.fambda)
+  RStr = lambda s: "Split"
+def Split(drange, fambda):
+  # Split a range by a chunk size
+  assert Is_forward(drange)
+  return _SplitImpl(drange.Save(), fambda)
+
 class _ReduceImpl(_BaseImpl):
   def __init__(s, drange, dlambda, seed):
     super().__init__(drange)
     (s.dlambda, s.has_front, s.seed) = (dlambda, 0, seed)
   def Front(s):
-    if ( not s.has_front ):
-      s.has_front = 1
-      s.seed = s.dlambda(s.seed, super().Front())
+    s.seed = s.dlambda(s.seed, s.drange.Front())
     return s.seed
-  def Pop_front(s):
-    s.has_front = 0
-    super().Pop_front()
   Save = lambda s: Reduce_range(s.drange, s.dlambda, s.seed)
   RStr = lambda s: "Reduce"
 def Reduce_range(drange, dlambda, seed=None):
@@ -188,9 +240,6 @@ def Reduce_range(drange, dlambda, seed=None):
   # pop seed
   copy = drange.Save()
   reduce_seed = copy.Front() if seed is None else seed
-  if ( seed is None ):
-    assert(not copy.Empty())
-    copy.Pop_front()
   return _ReduceImpl(copy, dlambda, reduce_seed)
 
 def Reduce(drange, dlambda, seed=None):
@@ -205,6 +254,7 @@ def Reduce(drange, dlambda, seed=None):
 
 def Chain(*dranges):
   # Chains ranges together in linear order
+  from drange import Range
   orange = Range()
   for d in dranges:
     orange += d
@@ -223,11 +273,11 @@ def Array(drange):
     front = g.Front()
     if ( front != None ):
       orange.Put(front)
-    g.Pop_front()
   return orange
 
 def Iota(begin, end, stride=1):
   " A range from begin to end, with optional stride "
+  from drange import Range
   orange = Range()
   while ( begin < end ):
     orange.Put(begin)
@@ -243,7 +293,6 @@ def Print_all(drange, recurse=0):
   print(" "*recurse, drange.__str__())
   while ( not drange.Empty() ):
     front = drange.Front()
-    drange.Pop_front()
     if ( Is_forward(front) ):
       Print_all(front, recurse+2)
     else:

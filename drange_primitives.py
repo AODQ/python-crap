@@ -4,9 +4,7 @@
 from drange_interfaces import *
 
 def Is_input(drange):
-  return (hasattr(drange, "Empty") and
-          hasattr(drange, "Pop_front") and
-          hasattr(drange, "Front"))
+  return (hasattr(drange, "Empty") and hasattr(drange, "Front"))
 
 def Is_output(drange):
   return hasattr(drange, "Put")
@@ -18,8 +16,7 @@ def Is_forward_output(drange):
   return Is_forward(drange) and Is_output(drange)
 
 def Is_bidirectional(drange):
-  return (Is_forward(drange) and hasattr(drange, "Back") and
-                                 hasattr(drange, "Pop_back"))
+  return (Is_forward(drange) and hasattr(drange, "Back"))
 
 def Is_bidirectional_output(drange):
   return (Is_bidirectional(drange) and Is_output(drange) and
@@ -51,9 +48,8 @@ def Pop_front_n(drange, n, dlambda=None):
      left if the range empties before n advances"""
   while ( not drange.Empty() and n != 0 ):
     n -= 1
-    if ( dlambda != None ):
-      dlambda(drange.Front())
-    drange.Pop_front()
+    a = drange.Front()
+    if ( dlambda != None ): dlambda(a)
   return n
 
 def Pop_back_n(drange, n, dlambda=None):
@@ -62,9 +58,8 @@ def Pop_back_n(drange, n, dlambda=None):
   assert(Is_bidirectional(drange))
   while ( not drange.Empty() and n != 0 ):
     n -= 1
-    if ( dlambda != None ):
-      dlambda(drange.Back())
-    drange.Pop_back()
+    a = drange.Back()
+    if ( dlambda != None ): dlambda(a)
   return n
 
 def Move_front(drange, dlambda=None):
@@ -72,7 +67,6 @@ def Move_front(drange, dlambda=None):
   assert(Is_input(drange))
   assert(not drange.Empty())
   t = drange.Front()
-  drange.Pop_front()
   return (t if dlambda==None else dlambda(t))
 
 def Move_back(drange, dlambda=None):
@@ -80,7 +74,6 @@ def Move_back(drange, dlambda=None):
   assert(Is_bidirectional(drange))
   assert(not drange.Empty())
   t = drange.Back()
-  drange.Pop_back()
   return (t if dlambda==None else dlambda(t))
 
 def Move_at(drange, i, dlambda=None):
@@ -98,8 +91,12 @@ def Walk_length(drange):
   amt = 0
   while ( not drange.Empty() ):
     amt += 1
-    drange.Pop_front()
+    drange.Front()
   return amt
+
+def StrRange(_str):
+  from drange import Range
+  return Range(*list(_str))
 
 def PyIter(_drange):
   class _TempDrangeIterator:
@@ -109,7 +106,5 @@ def PyIter(_drange):
     def __next__(s):
       if ( s.drange.Empty() ):
         raise StopIteration
-      front = s.drange.Front()
-      s.drange.Pop_front()
-      return front
+      return s.drange.Front()
   return _TempDrangeIterator(_drange)

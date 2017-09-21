@@ -12,7 +12,24 @@ class __MemoryPool:
     (s._mempool, s._freemem, s._counter) = ({}, [], 0)
     #{ID : [refcount, memory]}
   def Report_leaked_memory(s):
-    pass
+    import gc
+    # I have to collect a few times, in order to be more accurate, because
+    # for whatever reason not everything is collected though I've asked.
+    # If you remove `del` in Deallocate you can see for yourself that this
+    # doesn't touch __MemoryPool memory
+    gc.collect()
+    gc.collect()
+    gc.collect()
+    print("MEMORY LEAK REPORT -------------------------------")
+    cnt = 0
+    for leak in s._mempool:
+      cnt = 1
+      print("LEAK ID: ", leak)
+      print("   count:  ", s._mempool[leak][0])
+      print("   memory: ", s._mempool[leak][1])
+    if ( not cnt ):
+      print("No leaks")
+    print("--------------------------------------------------")
   def RSlice_count(s):
     return len(s._mempool)
   def Allocate(s, memory):
@@ -54,6 +71,8 @@ class __MemoryPool:
     return s._mempool[ptr][1][index]
 
 _memorypool = __MemoryPool()
+def Report_leaked_memory():
+  _memorypool.Report_leaked_memory()
 
 class _Any:
   __str__ = lambda s: "Any"
@@ -138,7 +157,9 @@ class _FakeFront():
     assert s._trange.begin < s._trange.end
   def __call__(s):
     s.Invariant()
-    return _memorypool.RElement(s._trange._ptr, s._trange.begin)
+    val = _memorypool.RElement(s._trange._ptr, s._trange.begin)
+    s._trange.begin += 1
+    return val
   def Set(s, o):
     s.Invariant()
     s._trange._ptr = _memorypool.SElement(s._trange._ptr, s._trange.begin, o)
@@ -152,9 +173,6 @@ class InputRange(TemplateRange):
     s.Front = _FakeFront(s)
   def Empty(s):
     return s.begin == s.end
-  def Pop_front(s):
-    assert s.begin < s.end
-    s.begin += 1
   RStr = lambda s: "InputRange"
 
 class ForwardRange(InputRange):
@@ -177,8 +195,6 @@ class ForwardRange(InputRange):
     while ( not savs.Empty() and not savo.Empty() ):
       if ( savs.Front() != savo.Front() ):
         return False
-      savs.Pop_front()
-      savo.Pop_front()
     return savs.Empty() and savo.Empty()
 
 class BidirectionalRange(ForwardRange):
@@ -186,11 +202,9 @@ class BidirectionalRange(ForwardRange):
     super().__init__(*args, noalloc=noalloc)
   RStr = lambda s: "BidirectionalRange"
   def Back(s):
-    assert s.end-1 > s.begin
-    return _memorypool[s._ptr][s.end-1]
-  def Pop_back(s):
-    assert s.end-1 > s.begin
+    assert not s.Empty()
     s.end -= 1
+    return _memorypool.RElement(s._ptr, s.end)
 
 class RandomAccessRange(BidirectionalRange):
   def __init__(s, *args, noalloc=None):
