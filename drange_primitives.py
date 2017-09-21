@@ -108,3 +108,8 @@ def PyIter(_drange):
         raise StopIteration
       return s.drange.Front()
   return _TempDrangeIterator(_drange)
+
+def Try_save(drange):
+  if ( Is_forward(drange) ):
+    return drange.Save()
+  return drange
