@@ -6,17 +6,7 @@ print("is infinite 12 12 12.. ", Is_infinite(Range(12).Cycle()))
 for x in StrRange('Hello'): print(x, end=", ")
 print()
 
-# this is now a lazy range that can be iterated
-double = (Range(2, 3, 4).Map   (lambda l: l*4)
-                        .Filter(lambda t: t >= 0)
-                        .Tee   (lambda t: print("(lazy: ", t, end="), "))
-                        .Map   (lambda t: t//2)
-)
-print("double list name: ", double)
-print("has iter attrib? ", hasattr(double, "__iter__")) #t
-print("has next attrib? ", hasattr(double, "__next__")) #f
-print("iter has next attrib? ", hasattr(double.__iter__(), "__next__")) #t
-for i in double: print(i, end=", ")
+for i in Range(2, 3, 4, 5, 6).Map(lambda l: l*4): print(i, end=", ")
 print()
 
 print("Just letters --")

@@ -1,0 +1,10 @@
+import os
+
+
+
+print('Lₒ(P, ωₒ) = Lₑ(P, ωₒ) + ∫Ω F(P, ωᵢ, ωₒ) Lᵢ(P, ωᵢ) cosθᵢ dωᵢ')
+Lₒ = 0.0
+for i in range(0, 10):
+  ωₒ = i*0.2
+  Lₒ += ωₒ
+print(Lₒ)
