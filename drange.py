@@ -20,6 +20,7 @@ Restrictions:
 from drange_functional import *
 from drange_primitives import *
 from drange_interfaces import *
+from drange_files import *
 
 class Range(RandomAccessRange, OutputRange, UFCS_Mixin):
   """ The 'array' implementation of range; giving power of ranges with
