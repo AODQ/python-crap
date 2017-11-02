@@ -9,7 +9,7 @@ class File(UFCS_Mixin):
   def __init__(s, fil):
     s.fp = open(fil, 'r', encoding='utf-8')
     s.nline = s.fp.readline()
-  Empty = % s: s.nline == ''
+  Empty = lambda s: s.nline == ''
   def Front(s):
     (t, s.nline) = (s.nline, s.fp.readline())
     return t
@@ -17,7 +17,7 @@ class File(UFCS_Mixin):
 
 
 phonemap = (Iota(0, 9)
-             .Map(% t: Range(t*3, t*3+1, t*3+2).Map(% s: chr(97+s)).Array())
+             .Map(lambda t: Range(t*3, t*3+1, t*3+2).Map(lambda s: chr(97+s)).Array())
 ).Array();
 phonemap[8] = Range('w', 'x', 'y', 'z')
 print(phonemap)
@@ -26,8 +26,8 @@ def PhoneMatch(numrange, strrange):
   if ( numrange.Length() != strrange.Length() ):
     return False
   blah = (Iota(0, numrange.Length())
-          .Filter(% it: (
-              numrange[it].Filter(% nr: nr == strrange[it]).Array().Length() > 0
+          .Filter(lambda it: (
+              numrange[it].Filter(lambda nr: nr == strrange[it]).Array().Length() > 0
         )))
   return blah.Array().Length() == numrange.Length()
 
@@ -40,8 +40,8 @@ g("theend", "aee");
 
 
 while ( True ):
-  num = StrRange(input('')[:]).Map(% a: int(a)).Array();
-  num = num.Map(% t: phonemap[t-2]).Array()
-  res = (File('dict').Map(% dictstr: dictstr[:-1])
-                    .Filter(% dictstr: PhoneMatch(num, StrRange(dictstr))));
+  num = StrRange(input('')[:]).Map(lambda a: int(a)).Array();
+  num = num.Map(lambda t: phonemap[t-2]).Array()
+  res = (File('dict').Map(lambda dictstr: dictstr[:-1])
+                    .Filter(lambda dictstr: PhoneMatch(num, StrRange(dictstr))));
   print(res.Array());
