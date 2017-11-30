@@ -110,6 +110,14 @@ def StrRange(_str):
   from drange import Range
   return Range(*list(_str))
 
+def PyRange(_drange):
+  assert(Is_forward(_drange))
+  drange = _drange.Save()
+  ts = []
+  while ( not drange.Empty() ):
+    ts += [drange.Front()]
+  return ts
+
 def PyIter(_drange):
   class _TempDrangeIterator:
     def __init__(s, drange):

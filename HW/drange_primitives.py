@@ -79,10 +79,22 @@ def Move_back(drange, dlambda=None):
 def Move_at(drange, i, dlambda=None):
   """Removes and returns the i'th element of a random-access range,
       NOTE: this only works with ranges that delete on setitem(None)!"""
-  assert(Is_random_access(drange))
-  t = drange.__getitem__(i)
-  drange.__setitem__(i, None)
-  return t
+  if ( Is_random_access(drange) ):
+    t = drange.__getitem__(i)
+    drange.__setitem__(i, None)
+    return t
+  # last index
+  if ( i == -1 ):
+    t = drange.Front();
+    while ( not drange.Empty() ):
+      t = drange.Front();
+    return t;
+
+  amt = 0;
+  while ( not drange.Empty() and amt < i-1 ):
+    amt += 1
+    drange.Front()
+  return drange.Front()
 
 def Walk_length(drange):
   """Walks the length of a forward range, computing at O(n) time"""
@@ -97,6 +109,14 @@ def Walk_length(drange):
 def StrRange(_str):
   from drange import Range
   return Range(*list(_str))
+
+def PyRange(_drange):
+  assert(Is_forward(_drange))
+  drange = _drange.Save()
+  ts = []
+  while ( not drange.Empty() ):
+    ts += [drange.Front()]
+  return ts
 
 def PyIter(_drange):
   class _TempDrangeIterator:

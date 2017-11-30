@@ -13,6 +13,7 @@ class UFCS_Mixin(object):
   Each      = lambda s, f            : Each(s.UFCS_Save(), f)
   Enumerate = lambda s               : Enumerate(s.UFCS_Save())
   Filter    = lambda s, f            : Filter(s.UFCS_Save(), f)
+  Join      = lambda s, f            : Join(s.UFCS_Save(), f)
   Map       = lambda s, f            : Map(s.UFCS_Save(), f)
   Print_all = lambda s               : Print_all(s.UFCS_Save())
   Reduce    = lambda s, f, seed=None : Reduce(s.UFCS_Save(), f, seed)
@@ -62,6 +63,29 @@ def Take(drange, amt):
   " Takes a lazy amount from range, or the range length less than amount "
   assert Is_input(drange)
   return _TakeImpl(drange, amt)
+
+class _JoinImpl(_BaseImpl):
+  def __init__(s, drange, dlambda):
+    from drange import Range
+    super().__init__(drange)
+    s.dlambda = dlambda;
+  def Front(s):
+    from drange import Range
+    s.drt = Range()
+    while True:
+      if ( s.drange.Empty() ): break;
+      t = s.drange.Front()
+      if ( s.dlambda(t) ): break;
+      s.drt += t
+    return s.drt;
+  Empty = lambda s: s.drange.Empty()
+  Save = lambda s: Join(Try_save(s.drange), s.dlambda)
+  RStr = lambda s: "Join"
+def Join(drange, dlambda):
+  """ Joins a range into multiple ranges using dlambda """
+  assert Is_input(drange)
+  return _JoinImpl(drange, dlambda)
+
 
 class _MapImpl(_BaseImpl):
   def __init__(s, drange, dlambda):
@@ -132,8 +156,9 @@ class _EnumerateImpl(_BaseImpl):
     super().__init__(drange)
     s.enumerator = 0
   def Front(s):
-    val = (s.drange.Front(), s.enumerator)
+    val = (s.drange.Front(), s.enumerator+1)
     s.enumerator += 1
+    print("VAL: ", val)
     return val
   Save = lambda s: Enumerate(Try_save(s.drange))
   RStr = lambda s: "Enumerate"
@@ -329,6 +354,18 @@ def Array(drange):
     if ( front != None ):
       orange.Put(front)
   return orange
+
+def PArray(drange):
+  """ Computes lazy range, returns python array of results """
+  from drange import Range
+  assert Is_input(drange)
+  g = Try_save(drange)
+  orange = []
+  while ( not g.Empty() ):
+    front = g.frint()
+    if ( front != None ):
+      orange += [front];
+  return orange;
 
 def Each(drange, fambda):
   """ Applies fambda to each element of drange, non-lazily (equivalent to
