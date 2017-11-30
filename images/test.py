@@ -17,7 +17,7 @@ def Circle_Modulo(d, o):
   o -= d/2
   o.x = (o.x % 32.0) - 16.0
   o.y = (o.y % 32.0) - 16.0
-  dist = length(o) - (10.0 + 2.0*sin(o.y*o.x))
+  dist = length(o) - (6.0 + 2.0*sin(o.y*o.x))
   return [dist, t.x/d.x, t.y/d.y, 1.0]
 def BoxCircle(d, o):
   pass
@@ -32,8 +32,19 @@ def MandelbrotFractal ( d, o ):
 
   it *= 1.0/64.0
   return [-1, it, it*0.5, it]
+def JuliaSet ( d, o, c ):
+  zoom = 1.0
+  z = vec2(1.5 * (o.x - d.x*0.5)/(0.5*zoom*d.x),
+                 (o.y - d.y*0.5)/(0.5*zoom*d.y))
+  (max_it, it) = (512, 0)
+  while ( it < max_it ):
+    if ( length(z) >= 20000.0 ): break;
+    z = vec2(z.x*z.x - z.y*z.y, z.x*z.y + z.y*z.x) + c
+    it += 1
+
+  return [-1, it/max_it, ((it*2.0)%256)/256.0, (it<max_it)]
 def noise( u ):
-  return sin(u.x*1.5)*sin(1.5*u.y)
+  return sin(u.x*1.5)*cos(1.5*u.y)
 def FMul(u, m):
   return vec2(m[0]*u.x + m[2]*u.y,
               m[1]*u.x + m[3]*u.y);
@@ -52,11 +63,6 @@ opUnion        = lambda u, v: (u, v)[u[0] > v[0]]
 opIntersection = lambda u, v: (u, v)[u[0] < v[0]]
 opSubtraction  = lambda u, v: (u, v)[-u[0] < v[0]]
 
-def clamp(u, a, b):
-  if ( u < a ): return a;
-  if ( u > b ): return b;
-  return u
-
 def lerp(x, y, a):
   return x * (1.0 - a) + y*a;
 
@@ -65,10 +71,7 @@ def smin(a, b, k):
   h = clamp(0.5 + 0.5*(b-a)/k, 0.0, 1.0)
   return lerp(b, a, h) - k*h*(1.0-h)
 
-
-def fbm_pattern(u):
-  return FBM(u + FBM(u + FBM(u)))
-
+fract = lambda x: x-int(x)
 
 plane = misc.imread("image.png")
 d = vec2(plane.shape[1], plane.shape[0])
@@ -82,28 +85,39 @@ for x in range(0, plane.shape[1]):
     # dist = Circle_Modulo(d, o)
     # dist = Square(o-d/2, vec2(45.0), 2.0)
 
-    square = Square(o-d/2, vec2(45.0), 2.0)
-    circle = Circle_Modulo(d, o)
-    dist = opSubtraction(square, circle)
+    # square = Square(o-d/2, vec2(45.0), 2.0)
+    # circle = Circle_Modulo(d, o)
+    # dist = opUnion(square, circle)
 
-    # square = Square(rot(o-d/4, vec2(45.0), 3.0)
+    # square = Square(o-d/4, vec2(45.0), 4.0)
     # circle = Circle(o-d/2+d/16, 45.0)
     # dist = opUnion(square, circle)
     # dist = [0.0, 1.0, 1.0, 1.0]
     # dist[0] = smin(square[0], circle[0], 32.4)
 
+    # circle = Circle_Modulo(d, o)
+    # circle2 = Circle_Modulo(d, o+d*0.5)
+    # dist = [0.0, 1.0, 1.0, 1.0]
+    # dist[0] = smin(circle[0], circle2[0], 40.4)
+    # dist[0] = opSubtraction(dist, Circle_Lipschitz(d, o))[0]
+
     # ---- fractals ----
     # dist = MandelbrotFractal(d, o)
-    # dist = [-1.0, 1.0, 1.0, 1.0]
-    # p = (-1.0 + 2.0*o/d)*2.0
+    # dist = JuliaSet(d, o, vec2(-0.7269, 0.1889))
+    # dist = JuliaSet(d, o, vec2(-0.835, 0.232))
+    # dist = JuliaSet(d, o, vec2(1.61803398) - vec2(2.0, 1.0))
+    # dist = [-1.0, 0.0, 0.0, 0.0]
+    # p = (0.0 + 2.0*(o/d))*4.0
     # dist[1] = dist[2] = dist[3] = FBM(p)
     # dist[1] = dist[2] = dist[3] = FBM(p + FBM(p))
-    # dist[1] = dist[2] = dist[3] = fbm_pattern(p)
+    # dist[1] = FBM(p*0.42 +
+    #             FBM(p*vec2(0.23, 1.232) + FBM(p*1.3+fract(80.0*sin(p.x*12.232)) +
+    #             FBM(p*9.1*sin(8.392*p.y+p.x*423.232)))))
+
 
     t = lambda a: int(a*255);
     plane[y, x, :] = (
-      [t(dist[1]), t(dist[2]), t(dist[3]), 255],
-      [0, 0, 0, 255])[int(dist[0] > 0)]
+      (Apply_Col(dist), Apply_Col([0, 0, 0]))[int(dist[0] > 0)])
 
 plt.imshow(plane)
 plt.show()
