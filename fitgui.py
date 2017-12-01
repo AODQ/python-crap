@@ -99,18 +99,19 @@ class PlotCanvas(FigureCanvas):
         for i in range(0, len(result.best_fit)-1):
           l = (i,   result.best_fit[i  ])
           h = (i+1, result.best_fit[i+1])
-
-
           sqr = lambda x: x*x;
-
-          dist = (abs((h[1] - l[1])*x[i] - (h[0] - l[0])*y[i] +
-                      h[0]*l[1] - h[1]*l[0]));
-          dist /= sqrt(sqr(h[1] - l[1]) + sqr(h[0] - l[0]))
-
-          print(dist)
-          if ( dist > bestdist ):
-            best = i;
-            bestdist = dist
+          ibest = 0
+          ibestdist = 0.0
+          for j in range(0, len(x)):
+            idist = (abs((h[1] - l[1])*x[j] - (h[0] - l[0])*y[j] +
+                        h[0]*l[1] - h[1]*l[0]));
+            idist /= sqrt(sqr(h[1] - l[1]) + sqr(h[0] - l[0]))
+            if ( idist > ibestdist ):
+                ibest = j;
+                ibestdist = idist
+          if ( ibestdist > bestdist ):
+            best = ibest
+            bestdist = ibestdist
 
         print(result.best_fit);
         print(result.best_values);
